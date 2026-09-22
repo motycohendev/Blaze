@@ -19,6 +19,7 @@ namespace Blaze.Evaluation
             int eval = 0;
 
             eval += CountMaterial(board);
+            eval += Activity.EvaluatePieceSquareTables(board);
 
             int colorBias = board.IsWhiteToMove ? 1 : -1;
             return eval * colorBias;
