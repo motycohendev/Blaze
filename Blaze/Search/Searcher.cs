@@ -15,7 +15,7 @@ namespace Blaze.Search
         private static int bestEval;
         private static int bestEvalThisIteration;
 
-        private static int Depth = 3;
+        private static int Depth;
         private const int MaxDepth = 255;
         private const int NegativeInfinity = -1000000;
         private const int PositiveInfinity = 1000000;
@@ -61,33 +61,47 @@ namespace Blaze.Search
 
             stopwatch = Stopwatch.StartNew();
 
-            nodes = 0;
-
-            Array.Clear(pvLength, 0, pvLength.Length);
-
-            Search(Depth, 0);
-
-            pvLine = "";
-
-            for (int i = 0; i < pvLength[0]; i++)
-            {
-                pvLine += Notation.MoveToNotation(pvArray[0][i]) + " ";
-            }
-
-            elapsedMs = stopwatch.ElapsedMilliseconds;
-
-            nps = elapsedMs > 0 ? nodes * 1000L / elapsedMs : 0;
-
-            bestMove = bestMoveThisIteration;
-            bestEval = bestEvalThisIteration;
-
-            PrintInfoLine();
+            StartIterativeDeepeningSearch();
 
             OnSearchComplete?.Invoke(bestMove);
         }
 
+        private static void StartIterativeDeepeningSearch()
+        {
+            for (Depth = 1; Depth <= MaxDepth; Depth++)
+            {
+                nodes = 0;
+
+                Array.Clear(pvLength, 0, pvLength.Length);
+
+                Search(Depth, 0);
+
+                pvLine = "";
+
+                for (int i = 0; i < pvLength[0]; i++)
+                {
+                    pvLine += Notation.MoveToNotation(pvArray[0][i]) + " ";
+                }
+
+                if (searchCancelled)
+                    break;
+
+                elapsedMs = stopwatch.ElapsedMilliseconds;
+
+                nps = elapsedMs > 0 ? nodes * 1000L / elapsedMs : 0;
+
+                bestMove = bestMoveThisIteration;
+                bestEval = bestEvalThisIteration;
+
+                PrintInfoLine();
+            }
+        }
+
         private static int Search(int depth, int plyFromRoot)
         {
+            if (searchCancelled && Depth > 1)
+                return 0;
+
             if (board.IsDraw())
                 return 0;
 
@@ -115,10 +129,11 @@ namespace Blaze.Search
                 Move move = moves[i];
 
                 board.MakeMove(move);
-
                 int score = -Search(depth - 1, plyFromRoot + 1);
-
                 board.UndoMove(move);
+
+                if (searchCancelled && Depth > 1)
+                    break;
 
                 if (score > bestScore)
                 {
