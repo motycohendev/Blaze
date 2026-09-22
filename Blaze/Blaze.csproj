@@ -5,7 +5,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
-    <BaseOutputPath>C:\Users\Moty\OneDrive\Desktop\Coding\Blaze\Blaze\bin\Versions\Alpha\V0.3</BaseOutputPath>
+    <BaseOutputPath>C:\Users\Moty\OneDrive\Desktop\Coding\Blaze\Blaze\bin\Versions\Alpha\V0.5</BaseOutputPath>
   </PropertyGroup>
 
 </Project>
