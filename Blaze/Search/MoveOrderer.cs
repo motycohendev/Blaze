@@ -14,19 +14,22 @@ namespace Blaze.Search
             0 // King
         };
 
-        public static void OrderMoves(Span<Move> moves, Board board)
+        public static void OrderMoves(Span<Move> moves, Board board, Move ttMove)
         {
             moves.Sort((a, b) =>
             {
-                int scoreA = Score(a, board);
-                int scoreB = Score(b, board);
+                int scoreA = Score(a, board, ttMove);
+                int scoreB = Score(b, board, ttMove);
                 return scoreB.CompareTo(scoreA);
             });
         }
 
-        private static int Score(Move move, Board board)
+        private static int Score(Move move, Board board, Move ttMove)
         {
             int score = 0;
+
+            if (move.Equals(ttMove))
+                return 1_000_000; // Highest priority for transposition table move
 
             //Capture
             if (board.Squares[move.TargetSquare] != Piece.None)

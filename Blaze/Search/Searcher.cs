@@ -54,6 +54,8 @@ namespace Blaze.Search
             for (int i = 0; i < MaxDepth; i++)
                 pvArray[i] = new Move[MaxDepth];
 
+            TranspositionTable.Initialize(128);
+
             bestMove = Move.NullMove;
             bestMoveThisIteration = Move.NullMove;
 
@@ -113,6 +115,9 @@ namespace Blaze.Search
             if (depth == 0)
                 return Quiesce(alpha, beta);
 
+            int originalAlpha = alpha;
+            ulong key = board.CurrentHash;
+
             Span<Move> moves = stackalloc Move[218];
 
             int moveCount = board.GetLegalMoves(moves);
@@ -125,7 +130,14 @@ namespace Blaze.Search
                 return 0;
             }
 
-            MoveOrderer.OrderMoves(moves[..moveCount], board);
+            Move ttMove = Move.NullMove;
+
+            if (plyFromRoot > 0 && TranspositionTable.Probe(key, depth, alpha, beta, plyFromRoot, out int ttScore, out ttMove))
+            {
+                return ttScore;
+            }
+
+            MoveOrderer.OrderMoves(moves[..moveCount], board, ttMove);
 
             int bestScore = NegativeInfinity;
             Move bestMoveThisNode = Move.NullMove;
@@ -170,6 +182,21 @@ namespace Blaze.Search
                 }
             }
 
+            TTFlag flag;
+            if (bestScore <= originalAlpha) 
+            { 
+                flag = TTFlag.UpperBound;
+            }
+            else if (bestScore >= beta) 
+            {
+                flag = TTFlag.LowerBound;
+            } 
+            else 
+            {
+                flag = TTFlag.Exact;
+            }
+            TranspositionTable.Store(key, depth, bestScore, plyFromRoot, flag, bestMoveThisNode); 
+
             return bestScore;
         }
 
@@ -190,7 +217,7 @@ namespace Blaze.Search
 
             int moveCount = board.GetLegalMoves(moves, true);
 
-            MoveOrderer.OrderMoves(moves[..moveCount], board);
+            MoveOrderer.OrderMoves(moves[..moveCount], board, Move.NullMove);
 
             for (int i = 0; i < moveCount; i++)  {
                 Move move = moves[i];
