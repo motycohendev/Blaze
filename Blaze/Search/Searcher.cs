@@ -125,6 +125,8 @@ namespace Blaze.Search
                 return 0;
             }
 
+            MoveOrderer.OrderMoves(moves[..moveCount], board);
+
             int bestScore = NegativeInfinity;
             Move bestMoveThisNode = Move.NullMove;
 
@@ -187,6 +189,8 @@ namespace Blaze.Search
             Span<Move> moves = stackalloc Move[218];
 
             int moveCount = board.GetLegalMoves(moves, true);
+
+            MoveOrderer.OrderMoves(moves[..moveCount], board);
 
             for (int i = 0; i < moveCount; i++)  {
                 Move move = moves[i];
