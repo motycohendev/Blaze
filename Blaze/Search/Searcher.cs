@@ -2,6 +2,7 @@
 using Blaze.Helpers;
 using Blaze.MoveGen;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using static System.Formats.Asn1.AsnWriter;
 
 namespace Blaze.Search
@@ -55,6 +56,7 @@ namespace Blaze.Search
                 pvArray[i] = new Move[MaxDepth];
 
             TranspositionTable.Initialize(128);
+            MoveOrderer.ClearKillers();
 
             bestMove = Move.NullMove;
             bestMoveThisIteration = Move.NullMove;
@@ -137,7 +139,7 @@ namespace Blaze.Search
                 return ttScore;
             }
 
-            MoveOrderer.OrderMoves(moves[..moveCount], board, ttMove);
+            MoveOrderer.OrderMoves(moves[..moveCount], board, ttMove, plyFromRoot);
 
             int bestScore = NegativeInfinity;
             Move bestMoveThisNode = Move.NullMove;
@@ -177,6 +179,8 @@ namespace Blaze.Search
                     alpha = Math.Max(alpha, bestScore);
                     if (alpha >= beta)
                     {
+                        if (board.Squares[move.TargetSquare] == Piece.None)
+                            MoveOrderer.StoreKiller(move, plyFromRoot);
                         break; // Beta cutoff
                     }
                 }
@@ -217,7 +221,7 @@ namespace Blaze.Search
 
             int moveCount = board.GetLegalMoves(moves, true);
 
-            MoveOrderer.OrderMoves(moves[..moveCount], board, Move.NullMove);
+            MoveOrderer.OrderMoves(moves[..moveCount], board, Move.NullMove, -1);
 
             for (int i = 0; i < moveCount; i++)  {
                 Move move = moves[i];
