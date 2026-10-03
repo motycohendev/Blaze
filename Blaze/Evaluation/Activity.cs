@@ -5,7 +5,7 @@ namespace Blaze.Evaluation
     public static class Activity
     {
         #region SQUARE_TABLES
-        private static readonly int[] PawnSquareTables =
+        private static readonly int[] EarlyPawnSquareTables =
         {
              0,  0,  0,  0,  0,  0,  0,  0,
             50, 50, 50, 50, 50, 50, 50, 50,
@@ -15,6 +15,18 @@ namespace Blaze.Evaluation
              5, -5,-10,  0,  0,-10, -5,  5,
              5, 10, 10,-20,-20, 10, 10,  5,
              0,  0,  0,  0,  0,  0,  0,  0
+        };
+
+        private static readonly int[] LatePawnSquareTables =
+        {
+             0,  0,  0,  0,  0,  0,  0,  0,
+             80,  80,  80,  80,  80,  80,  80,  80,
+             50,  50,  50,  50,  50,  50,  50,  50,
+             30,  30,  30,  30,  30,  30,  30,  30,
+             20,  20,  20,  20,  20,  20,  20,  20,
+             10,  10,  10,  10,  10,  10,  10,  10,
+             10,  10,  10,  10,  10,  10,  10,  10,
+             0,  0,  0,  0,  0,  0,  0,  0,
         };
 
         private static readonly int[] KnightSquareTables =
@@ -65,7 +77,7 @@ namespace Blaze.Evaluation
             -20,-10,-10, -5, -5,-10,-10,-20
         };
 
-        private static readonly int[] KingSquareTables =
+        private static readonly int[] EarlyKingSquareTables =
         {
             -30,-40,-40,-50,-50,-40,-40,-30,
             -30,-40,-40,-50,-50,-40,-40,-30,
@@ -77,20 +89,46 @@ namespace Blaze.Evaluation
              20, 30, 10,  0,  0, 10, 30, 20
         };
 
-        private static readonly int[][] SquareTables =
+        private static readonly int[] LateKingSquareTables =
         {
-            PawnSquareTables,
+            -50,-40,-30,-20,-20,-30,-40,-50,
+            -30,-20,-10,  0,  0,-10,-20,-30,
+            -30,-10, 20, 30, 30, 20,-10,-30,
+            -30,-10, 30, 40, 40, 30,-10,-30,
+            -30,-10, 30, 40, 40, 30,-10,-30,
+            -30,-10, 20, 30, 30, 20,-10,-30,
+            -30,-30,  0,  0,  0,  0,-30,-30,
+            -50,-30,-30,-30,-30,-30,-30,-50
+        };
+
+        private static readonly int[][] EarlySquareTables =
+        {
+            EarlyPawnSquareTables,
             KnightSquareTables,
             BishopSquareTables,
             RookSquareTables,
             QueenSquareTables,
-            KingSquareTables
+            EarlyKingSquareTables
+        };
+
+        private static readonly int[][] LateSquareTables =
+        {
+            LatePawnSquareTables,
+            KnightSquareTables,
+            BishopSquareTables,
+            RookSquareTables,
+            QueenSquareTables,
+            LateKingSquareTables
         };
         #endregion
 
-        public static int EvaluateSquareTables(Board board)
+        private static readonly int[] gamePhaseInc = {0,1,1,2,4,0};
+
+    public static int EvaluateSquareTables(Board board)
         {
-            int eval = 0;
+            int mgEval = 0;
+            int egEval = 0;
+            int gamePhase = 0;
 
             for (int i = 0; i < 12; i++)
             {
@@ -103,11 +141,14 @@ namespace Blaze.Evaluation
                     int square = BitboardHelper.PopLSB(ref Bitboard);
                     int squareIndex = color == 1 ? square ^ 56 : square; // Flip the square index for black pieces
 
-                    eval += SquareTables[pieceType][squareIndex] * color;
+                    mgEval += EarlySquareTables[pieceType][squareIndex] * color;
+                    egEval += LateSquareTables[pieceType][squareIndex] * color;
+
+                    gamePhase += gamePhaseInc[pieceType];
                 }
             }
 
-            return eval;
+            return (mgEval * gamePhase + egEval * (24 - gamePhase)) / 24;
         }
     }
 }

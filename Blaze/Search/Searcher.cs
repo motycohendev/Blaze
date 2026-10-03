@@ -144,12 +144,35 @@ namespace Blaze.Search
             int bestScore = NegativeInfinity;
             Move bestMoveThisNode = Move.NullMove;
 
+            bool firstMove = true;
+
             for (int i = 0; i < moveCount; i++)
             {
                 Move move = moves[i];
 
                 board.MakeMove(move);
-                int score = -Search(depth - 1, -beta, -alpha, plyFromRoot + 1);
+                int score;
+
+                //PVS
+                if (firstMove)
+                {
+                    score = -Search(depth - 1, -beta, -alpha, plyFromRoot + 1);
+
+                    firstMove = false;
+                }
+                else
+                {
+                    score = -Search(depth - 1, -alpha - 1, -alpha, plyFromRoot + 1);
+
+                    // The move might actually be better than alpha.
+                    // Re-search using the full window.
+
+                    if (score > alpha && score < beta)
+                    {
+                        score = -Search(depth - 1, -beta, -alpha, plyFromRoot + 1);
+                    }
+                }
+
                 board.UndoMove(move);
 
                 if (searchCancelled && Depth > 1)
