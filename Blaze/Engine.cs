@@ -10,7 +10,7 @@ namespace Blaze
     /// </summary>
     public class Engine
     {
-        public bool UseMaxTimePerMove { get; set; } = false;
+        public bool UseMaxTimePerMove { get; set; } = true;
         public int MaxTimePerMoveInMs { get; set; } = 100;
 
         public bool IsThinking { get; private set; }

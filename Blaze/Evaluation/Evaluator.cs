@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Numerics;
+﻿using System.Numerics;
 
 namespace Blaze.Evaluation
 {
@@ -20,6 +19,7 @@ namespace Blaze.Evaluation
             int eval = 0;
 
             eval += CountMaterial(board);
+            eval += Activity.EvaluatePieceSquareTables(board);
 
             int colorBias = board.IsWhiteToMove ? 1 : -1;
             return eval * colorBias;
