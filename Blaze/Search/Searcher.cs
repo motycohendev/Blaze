@@ -74,7 +74,7 @@ namespace Blaze.Search
             {
                 Array.Clear(pvLength, 0, pvLength.Length);
 
-                Search(Depth, 0);
+                Search(Depth, NegativeInfinity, PositiveInfinity, 0);
 
                 if (searchCancelled && Depth > 1)
                     break;
@@ -97,7 +97,7 @@ namespace Blaze.Search
             }
         }
 
-        private static int Search(int depth, int plyFromRoot)
+        private static int Search(int depth, int alpha, int beta, int plyFromRoot)
         {
             nodes++;
 
@@ -121,7 +121,7 @@ namespace Blaze.Search
             }
 
             if (depth == 0)
-                return Evaluator.Evaluate(board);
+                return Quiesce(alpha, beta);
 
             int bestScore = NegativeInfinity;
 
@@ -131,7 +131,7 @@ namespace Blaze.Search
 
                 board.MakeMove(move);
 
-                int score = -Search(depth - 1, plyFromRoot + 1);
+                int score = -Search(depth - 1, -beta, -alpha, plyFromRoot + 1);
 
                 board.UndoMove(move);
 
@@ -159,9 +159,49 @@ namespace Blaze.Search
                         bestEvalThisIteration = score;
                     }
                 }
+                alpha = Math.Max(alpha, bestScore);
+                if (alpha >= beta)
+                {
+                    break; // Beta cutoff
+                }
             }
 
             return bestScore;
+        }
+
+        private static int Quiesce(int alpha, int beta)
+        {
+            nodes++;
+
+            int static_eval = Evaluator.Evaluate(board);
+
+            // Stand Pat
+            int best_value = static_eval;
+            if (best_value >= beta)
+                return best_value;
+            if (best_value > alpha)
+                alpha = best_value;
+
+            Span<Move> moves = stackalloc Move[218];
+            int moveCount = board.GetLegalMoves(moves, true);
+
+            for (int i = 0; i < moveCount; i++)
+            {
+                Move move = moves[i];
+
+                board.MakeMove(move);
+                int score = -Quiesce(-beta, -alpha);
+                board.UndoMove(move);
+
+                if (score >= beta)
+                    return score;
+                if (score > best_value)
+                    best_value = score;
+                if (score > alpha)
+                    alpha = score;
+            }
+
+            return best_value;
         }
 
         private static bool IsMateScore(int score)
