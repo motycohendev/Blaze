@@ -123,6 +123,8 @@ namespace Blaze.Search
             if (depth == 0)
                 return Quiesce(alpha, beta);
 
+            MoveOrderer.OrderMoves(moves[..moveCount], board);
+
             int bestScore = NegativeInfinity;
 
             for (int i = 0; i < moveCount; i++)
@@ -184,6 +186,7 @@ namespace Blaze.Search
 
             Span<Move> moves = stackalloc Move[218];
             int moveCount = board.GetLegalMoves(moves, true);
+            MoveOrderer.OrderMoves(moves[..moveCount], board);
 
             for (int i = 0; i < moveCount; i++)
             {
