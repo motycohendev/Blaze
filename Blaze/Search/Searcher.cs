@@ -37,6 +37,11 @@ namespace Blaze.Search
 
         public static event Action<Move> OnSearchComplete;
 
+        static Searcher()
+        {
+            TranspositionTable.Initialize(16);
+        }
+
         public static void EndSearch()
         {
             searchCancelled = true;
@@ -44,6 +49,8 @@ namespace Blaze.Search
 
         public static void StartNewSearch()
         {
+            TranspositionTable.NewSearch();
+
             board = MatchManager.board;
 
             searchCancelled = false;
@@ -117,6 +124,40 @@ namespace Blaze.Search
             if (board.IsDraw())
                 return 0;
 
+            int alphaOriginal = alpha;
+            int betaOriginal = beta;
+
+            ulong key = board.CurrentHash;
+
+            Move ttMove = Move.NullMove;
+
+            if (TranspositionTable.Probe(key, out TTEntry ttEntry))
+            {
+                ttMove = ttEntry.BestMove;
+
+                if (plyFromRoot > 0 && ttEntry.Depth >= depth)
+                {
+                    int ttScore = ScoreFromTT(ttEntry.Score, plyFromRoot);
+
+                    switch (ttEntry.Flag)
+                    {
+                        case TTFlag.Exact:
+                            return ttScore;
+
+                        case TTFlag.LowerBound:
+                            if (ttScore >= beta)
+                                return ttScore;
+                            break;
+
+                        case TTFlag.UpperBound:
+                            if (ttScore <= alpha)
+                                return ttScore;
+                            break;
+                    }
+                }
+            }
+
+
             Span<Move> moves = stackalloc Move[218];
             int moveCount = board.GetLegalMoves(moves);
 
@@ -131,9 +172,10 @@ namespace Blaze.Search
             if (depth == 0)
                 return Quiesce(alpha, beta);
 
-            MoveOrderer.OrderMoves(moves[..moveCount], board, plyFromRoot == 0 ? bestMoveLastIteration : Move.NullMove);
+            MoveOrderer.OrderMoves(moves[..moveCount], board, plyFromRoot == 0 ? bestMoveLastIteration : Move.NullMove, ttMove);
 
             int bestScore = NegativeInfinity;
+            Move bestMoveThisNode = Move.NullMove;
 
             for (int i = 0; i < moveCount; i++)
             {
@@ -151,6 +193,7 @@ namespace Blaze.Search
                 if (score > bestScore)
                 {
                     bestScore = score;
+                    bestMoveThisNode = move;
 
                     pvArray[plyFromRoot][0] = move;
 
@@ -176,6 +219,17 @@ namespace Blaze.Search
                 }
             }
 
+            TTFlag flag;
+
+            if (bestScore <= alphaOriginal)
+                flag = TTFlag.UpperBound;
+            else if (bestScore >= betaOriginal)
+                flag = TTFlag.LowerBound;
+            else
+                flag = TTFlag.Exact;
+
+            TranspositionTable.Store(key, depth, ScoreToTT(bestScore, plyFromRoot), flag, bestMoveThisNode);
+
             return bestScore;
         }
 
@@ -194,7 +248,7 @@ namespace Blaze.Search
 
             Span<Move> moves = stackalloc Move[218];
             int moveCount = board.GetLegalMoves(moves, true);
-            MoveOrderer.OrderMoves(moves[..moveCount], board, Move.NullMove);
+            MoveOrderer.OrderMoves(moves[..moveCount], board, Move.NullMove, Move.NullMove);
 
             for (int i = 0; i < moveCount; i++)
             {
@@ -246,6 +300,30 @@ namespace Blaze.Search
                 $"time {elapsedMs} " +
                 $"pv {pvLine.Trim()}"
             );
+        }
+
+        private const int MateThreshold = 900000;
+
+        private static int ScoreToTT(int score, int ply)
+        {
+            if (score > MateThreshold)
+                return score + ply;
+
+            if (score < -MateThreshold)
+                return score - ply;
+
+            return score;
+        }
+
+        private static int ScoreFromTT(int score, int ply)
+        {
+            if (score > MateThreshold)
+                return score - ply;
+
+            if (score < -MateThreshold)
+                return score + ply;
+
+            return score;
         }
     }
 }
