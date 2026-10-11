@@ -11,6 +11,7 @@ namespace Blaze.Search
 
         private static Move bestMove;
         private static Move bestMoveThisIteration = Move.NullMove;
+        private static Move bestMoveLastIteration = Move.NullMove;
 
         private static int bestEval;
         private static int bestEvalThisIteration;
@@ -72,9 +73,17 @@ namespace Blaze.Search
 
             for (Depth = 1; Depth <= MaxDepth; Depth++)
             {
+                bestMoveThisIteration = Move.NullMove;                                                                                                                                  
+
                 Array.Clear(pvLength, 0, pvLength.Length);
 
                 Search(Depth, NegativeInfinity, PositiveInfinity, 0);
+
+                if (bestMoveThisIteration != Move.NullMove)
+                {
+                    bestMove = bestMoveThisIteration;
+                    bestEval = bestEvalThisIteration;
+                }
 
                 if (searchCancelled && Depth > 1)
                     break;
@@ -90,10 +99,9 @@ namespace Blaze.Search
 
                 nps = elapsedMs > 0 ? nodes * 1000L / elapsedMs : 0;
 
-                bestMove = bestMoveThisIteration;
-                bestEval = bestEvalThisIteration;
-
                 PrintInfoLine();
+
+                bestMoveLastIteration = bestMoveThisIteration;
             }
         }
 
@@ -123,7 +131,7 @@ namespace Blaze.Search
             if (depth == 0)
                 return Quiesce(alpha, beta);
 
-            MoveOrderer.OrderMoves(moves[..moveCount], board);
+            MoveOrderer.OrderMoves(moves[..moveCount], board, plyFromRoot == 0 ? bestMoveLastIteration : Move.NullMove);
 
             int bestScore = NegativeInfinity;
 
@@ -186,7 +194,7 @@ namespace Blaze.Search
 
             Span<Move> moves = stackalloc Move[218];
             int moveCount = board.GetLegalMoves(moves, true);
-            MoveOrderer.OrderMoves(moves[..moveCount], board);
+            MoveOrderer.OrderMoves(moves[..moveCount], board, Move.NullMove);
 
             for (int i = 0; i < moveCount; i++)
             {
