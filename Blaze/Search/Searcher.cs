@@ -51,6 +51,7 @@ namespace Blaze.Search
         {
             TranspositionTable.NewSearch();
             MoveOrderer.ClearKillers();
+            MoveOrderer.ClearHistory();
 
             board = MatchManager.board;
 
@@ -216,7 +217,19 @@ namespace Blaze.Search
                 alpha = Math.Max(alpha, bestScore);
                 if (alpha >= beta)
                 {
-                    MoveOrderer.AddKiller(move, plyFromRoot);
+                    if (board.Squares[move.TargetSquare] == Piece.None)
+                    {
+                        MoveOrderer.AddKiller(move, plyFromRoot);
+                        MoveOrderer.UpdateHistory(board.IsWhiteToMove, move, depth, true);
+
+                        // Penalize quiet moves that were tried first and failed to cut off
+                        for (int j = 0; j < i; j++)
+                        {
+                            Move earlier = moves[j];
+                            if (board.Squares[earlier.TargetSquare] == Piece.None)
+                                MoveOrderer.UpdateHistory(board.IsWhiteToMove, earlier, depth, false);
+                        }
+                    }
                     break; // Beta cutoff
                 }
             }

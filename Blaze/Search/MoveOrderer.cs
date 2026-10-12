@@ -6,13 +6,29 @@ namespace Blaze.Search
     {
         public const int MaxPly = 256;
         private const int KillerSlots = 2;
+        // 128 * 128
+        private const int MaxHistory = 16384;
+
+
+        private const int PvScore = 2_000_000;
+        private const int TTScore = 1_000_000;
+        private const int CaptureBase = 100_000;
+        private const int Killer1Score = 90_000;
+        private const int Killer2Score = 80_000;
 
         // killers[ply, slot]: quiet moves that caused a beta cutoff at this ply
         private static readonly Move[,] killers = new Move[MaxPly, KillerSlots];
+        // history[side, from, to]
+        private static readonly int[,,] history = new int[2, 64, 64];
 
         public static void ClearKillers()
         {
             Array.Clear(killers, 0, killers.Length);
+        }
+
+        public static void ClearHistory()
+        {
+            Array.Clear(history, 0, history.Length);
         }
 
         public static void AddKiller(Move move, int ply)
@@ -28,41 +44,55 @@ namespace Blaze.Search
             killers[ply, 0] = move;
         }
 
-        public static void OrderMoves(Span<Move> moves, Board board, Move PvMove, Move ttMove, int ply)
+        // good = true for the quiet move that caused a cutoff,
+        // false for quiet moves searched before it that didn't.
+        public static void UpdateHistory(bool whiteToMove, Move move, int depth, bool good)
         {
-            moves.Sort((a, b) =>
-            {
-                int scoreA = Score(a, board, PvMove, ttMove, ply);
-                int scoreB = Score(b, board, PvMove, ttMove, ply);
-                return scoreB.CompareTo(scoreA); // Descending order
-            });
+            int bonus = Math.Min(depth * depth, 1200);
+            if (!good)
+                bonus = -bonus;
+
+            ref int h = ref history[whiteToMove ? 0 : 1, move.StartingSquare, move.TargetSquare];
+
+            // Gravity: pulls h toward the bonus sign but keeps |h| < MaxHistory
+            h += bonus - h * Math.Abs(bonus) / MaxHistory;
         }
 
-        private static int Score(Move move, Board board, Move PvMove, Move ttMove, int ply)
+        public static void OrderMoves(Span<Move> moves, Board board, Move pvMove, Move ttMove, int ply)
         {
-            if (move == PvMove)
-                return 1000000;
+            int colorToMove = board.ColorToMove;
+            Span<int> scores = stackalloc int[moves.Length];
+            for (int i = 0; i < moves.Length; i++)
+                scores[i] = -Score(moves[i], board, colorToMove, pvMove, ttMove, ply); // negated: ascending sort = best first
+
+            scores.Sort(moves);
+        }
+
+        private static int Score(Move move, Board board, int colorToMove, Move pvMove, Move ttMove, int ply)
+        {
+            if (move == pvMove)
+                return PvScore;
 
             if (move == ttMove)
-                return 100000;
+                return TTScore;
 
-            // Captures
-            if (board.Squares[move.TargetSquare] != Piece.None)
+            int captured = board.Squares[move.TargetSquare];
+            if (captured != Piece.None)
             {
-                int capturedPieceType = Piece.PieceType(board.Squares[move.TargetSquare]);
+                int capturedPieceType = Piece.PieceType(captured);
                 int movingPieceType = Piece.PieceType(board.Squares[move.StartingSquare]);
-                return 1000 + 100 * capturedPieceType - movingPieceType;
+                return CaptureBase + 100 * capturedPieceType - movingPieceType;
             }
 
             if (ply >= 0 && ply < MaxPly)
             {
                 if (move == killers[ply, 0])
-                    return 900;
+                    return Killer1Score;
                 if (move == killers[ply, 1])
-                    return 800;
+                    return Killer2Score;
             }
 
-            return 0;
+            return history[colorToMove, move.StartingSquare, move.TargetSquare];
         }
     }
 }
