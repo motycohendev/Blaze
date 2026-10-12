@@ -185,7 +185,22 @@ namespace Blaze.Search
 
                 board.MakeMove(move);
 
-                int score = -Search(depth - 1, -beta, -alpha, plyFromRoot + 1);
+                int score;
+
+                // According to the move ordering, the first move is the most promising.
+                // do a full window search for it. For subsequent moves, we do a null window search first (scout search),
+                // and only do a full window search if the null window search indicates that the move is better than alpha.
+                if (i == 0)
+                {
+                    score = -Search(depth - 1, -beta, -alpha, plyFromRoot + 1);
+                }
+                else
+                {
+                    score = -Search(depth - 1, -alpha - 1, -alpha, plyFromRoot + 1);
+
+                    if (score > alpha && score < beta)
+                        score = -Search(depth - 1, -beta, -alpha, plyFromRoot + 1);
+                }
 
                 board.UndoMove(move);
 
@@ -197,16 +212,18 @@ namespace Blaze.Search
                     bestScore = score;
                     bestMoveThisNode = move;
 
-                    pvArray[plyFromRoot][0] = move;
-
-                    for (int j = 0; j < pvLength[plyFromRoot + 1]; j++)
+                    if (score > alpha)
                     {
-                        pvArray[plyFromRoot][j + 1] =
-                            pvArray[plyFromRoot + 1][j];
-                    }
+                        pvArray[plyFromRoot][0] = move;
 
-                    pvLength[plyFromRoot] =
-                        pvLength[plyFromRoot + 1] + 1;
+                        for (int j = 0; j < pvLength[plyFromRoot + 1]; j++)
+                        {
+                            pvArray[plyFromRoot][j + 1] =
+                                pvArray[plyFromRoot + 1][j];
+                        }
+
+                        pvLength[plyFromRoot] = pvLength[plyFromRoot + 1] + 1;
+                    }
 
                     if (plyFromRoot == 0)
                     {
