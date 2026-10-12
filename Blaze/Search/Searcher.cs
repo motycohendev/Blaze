@@ -50,6 +50,7 @@ namespace Blaze.Search
         public static void StartNewSearch()
         {
             TranspositionTable.NewSearch();
+            MoveOrderer.ClearKillers();
 
             board = MatchManager.board;
 
@@ -172,7 +173,7 @@ namespace Blaze.Search
             if (depth == 0)
                 return Quiesce(alpha, beta);
 
-            MoveOrderer.OrderMoves(moves[..moveCount], board, plyFromRoot == 0 ? bestMoveLastIteration : Move.NullMove, ttMove);
+            MoveOrderer.OrderMoves(moves[..moveCount], board, plyFromRoot == 0 ? bestMoveLastIteration : Move.NullMove, ttMove, plyFromRoot);
 
             int bestScore = NegativeInfinity;
             Move bestMoveThisNode = Move.NullMove;
@@ -215,6 +216,7 @@ namespace Blaze.Search
                 alpha = Math.Max(alpha, bestScore);
                 if (alpha >= beta)
                 {
+                    MoveOrderer.AddKiller(move, plyFromRoot);
                     break; // Beta cutoff
                 }
             }
@@ -248,7 +250,7 @@ namespace Blaze.Search
 
             Span<Move> moves = stackalloc Move[218];
             int moveCount = board.GetLegalMoves(moves, true);
-            MoveOrderer.OrderMoves(moves[..moveCount], board, Move.NullMove, Move.NullMove);
+            MoveOrderer.OrderMoves(moves[..moveCount], board, Move.NullMove, Move.NullMove, -1);
 
             for (int i = 0; i < moveCount; i++)
             {

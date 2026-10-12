@@ -5,7 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <BaseOutputPath>C:\Users\MOTY\Desktop\Coding\Blaze\Blaze\bin\Versions\V0.7</BaseOutputPath>
+    <BaseOutputPath>C:\Users\MOTY\Desktop\Coding\Blaze\Blaze\bin\Versions\V0.8</BaseOutputPath>
   </PropertyGroup>
 
 </Project>
