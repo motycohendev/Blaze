@@ -192,6 +192,7 @@ namespace Blaze.Search
                 return Quiesce(alpha, beta);
 
             MoveOrderer.OrderMoves(moves[..moveCount], board, plyFromRoot == 0 ? bestMoveLastIteration : Move.NullMove, ttMove, plyFromRoot);
+            int extension = board.IsInCheck() ? 1 : 0;
 
             int bestScore = NegativeInfinity;
             Move bestMoveThisNode = Move.NullMove;
@@ -209,14 +210,14 @@ namespace Blaze.Search
                 // and only do a full window search if the null window search indicates that the move is better than alpha.
                 if (i == 0)
                 {
-                    score = -Search(depth - 1, -beta, -alpha, plyFromRoot + 1);
+                    score = -Search(depth - 1 + extension, -beta, -alpha, plyFromRoot + 1);
                 }
                 else
                 {
-                    score = -Search(depth - 1, -alpha - 1, -alpha, plyFromRoot + 1);
+                    score = -Search(depth - 1 + extension, -alpha - 1, -alpha, plyFromRoot + 1);
 
                     if (score > alpha && score < beta)
-                        score = -Search(depth - 1, -beta, -alpha, plyFromRoot + 1);
+                        score = -Search(depth - 1 + extension, -beta, -alpha, plyFromRoot + 1);
                 }
 
                 board.UndoMove(move);
