@@ -82,7 +82,7 @@ namespace Blaze.Search
 
             for (Depth = 1; Depth <= MaxDepth; Depth++)
             {
-                bestMoveThisIteration = Move.NullMove;                                                                                                                                  
+                bestMoveThisIteration = Move.NullMove;
 
                 Array.Clear(pvLength, 0, pvLength.Length);
 
@@ -114,7 +114,7 @@ namespace Blaze.Search
             }
         }
 
-        private static int Search(int depth, int alpha, int beta, int plyFromRoot)
+        private static int Search(int depth, int alpha, int beta, int plyFromRoot, bool allowNull = true)
         {
             nodes++;
 
@@ -159,6 +159,23 @@ namespace Blaze.Search
                 }
             }
 
+            bool isPV = beta - alpha > 1;
+
+            if (!isPV && allowNull && plyFromRoot > 0 && depth >= 3 && Math.Abs(beta) < MateThreshold && !board.IsInCheck() && board.HasNonPawnMaterial() && Evaluator.Evaluate(board) >= beta)
+            {
+                int R = 2 + depth / 6;
+
+                board.MakeNullMove();
+                int nullScore = -Search(depth - 1 - R, -beta, -beta + 1, plyFromRoot + 1, false);
+                board.UndoNullMove();
+
+                if (searchCancelled && Depth > 1)
+                    return 0;
+
+                if (nullScore >= beta)
+                    return nullScore >= MateThreshold ? beta : nullScore;
+            }
+
 
             Span<Move> moves = stackalloc Move[218];
             int moveCount = board.GetLegalMoves(moves);
@@ -171,7 +188,7 @@ namespace Blaze.Search
                 return 0;
             }
 
-            if (depth == 0)
+            if (depth <= 0)
                 return Quiesce(alpha, beta);
 
             MoveOrderer.OrderMoves(moves[..moveCount], board, plyFromRoot == 0 ? bestMoveLastIteration : Move.NullMove, ttMove, plyFromRoot);
