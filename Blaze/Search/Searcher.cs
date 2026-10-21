@@ -11,6 +11,7 @@ namespace Blaze.Search
 
         private static Move bestMove;
         private static Move bestMoveThisIteration = Move.NullMove;
+        private static Move bestMoveLastIteration = Move.NullMove;
 
         private static int bestEval;
         private static int bestEvalThisIteration;
@@ -29,6 +30,9 @@ namespace Blaze.Search
 
         private static Move[][] pvArray;
         private static int[] pvLength;
+
+        private static Move[] prevPv = new Move[MaxDepth];
+        private static int prevPvLength;
 
         private static int nodes;
 
@@ -55,7 +59,7 @@ namespace Blaze.Search
                 pvArray[i] = new Move[MaxDepth];
 
             bestMove = Move.NullMove;
-            bestMoveThisIteration = Move.NullMove;
+            bestMoveLastIteration = Move.NullMove;
 
             bestEval = 0;
             bestEvalThisIteration = 0;
@@ -77,13 +81,19 @@ namespace Blaze.Search
 
                 Array.Clear(pvLength, 0, pvLength.Length);
 
-                Search(Depth, NegativeInfinity, PositiveInfinity, 0);
+                Search(Depth, NegativeInfinity, PositiveInfinity, 0, true);
+
+                if (bestMoveThisIteration != Move.NullMove)
+                {
+                    bestMove = bestMoveThisIteration;
+                    bestEval = bestEvalThisIteration;
+                }
 
                 if (searchCancelled && Depth > 1)
                     break;
 
-                bestMove = bestMoveThisIteration;
-                bestEval = bestEvalThisIteration;
+                prevPvLength = pvLength[0];
+                Array.Copy(pvArray[0], prevPv, prevPvLength);
 
                 pvLine = "";
 
@@ -97,10 +107,12 @@ namespace Blaze.Search
                 nps = elapsedMs > 0 ? nodes * 1000L / elapsedMs : 0;
 
                 PrintInfoLine();
+
+                bestMoveLastIteration = bestMoveThisIteration;
             }
         }
 
-        private static int Search(int depth, int alpha, int beta, int plyFromRoot)
+        private static int Search(int depth, int alpha, int beta, int plyFromRoot, bool onPv)
         {
             nodes++;
 
@@ -126,7 +138,9 @@ namespace Blaze.Search
             if (depth == 0)
                 return Quiesce(alpha, beta);
 
-            MoveOrderer.OrderMoves(moves[..moveCount], board);
+            Move pvMove = onPv && plyFromRoot < prevPvLength ? prevPv[plyFromRoot] : Move.NullMove;
+
+            MoveOrderer.OrderMoves(moves[..moveCount], board, plyFromRoot == 0 ? bestMoveLastIteration : Move.NullMove);
 
             int bestScore = NegativeInfinity;
 
@@ -134,8 +148,10 @@ namespace Blaze.Search
             {
                 Move move = moves[i];
 
+                bool childOnPv = pvMove != Move.NullMove && move == pvMove;
+
                 board.MakeMove(move);
-                int score = -Search(depth - 1, -beta, -alpha, plyFromRoot + 1);
+                int score = -Search(depth - 1, -beta, -alpha, plyFromRoot + 1, childOnPv);
                 board.UndoMove(move);
 
                 if (searchCancelled && Depth > 1)
@@ -184,7 +200,7 @@ namespace Blaze.Search
             Span<Move> moves = stackalloc Move[218];
             int moveCount = board.GetLegalMoves(moves, true);
 
-            MoveOrderer.OrderMoves(moves[..moveCount], board);
+            MoveOrderer.OrderMoves(moves[..moveCount], board, Move.NullMove);
 
             for (int i = 0; i < moveCount; i++)
             {
