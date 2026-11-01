@@ -53,7 +53,6 @@ namespace Blaze.Search
             tt.Clear();
         }
 
-        // Call on "setoption name Hash value N"
         public static void ResizeTT(int sizeMb)
         {
             tt.Resize(sizeMb);
@@ -63,6 +62,9 @@ namespace Blaze.Search
         {
 
             board = MatchManager.board;
+
+            MoveOrderer.ClearKillers();
+            MoveOrderer.AgeHistory();
 
             searchCancelled = false;
 
@@ -187,7 +189,7 @@ namespace Blaze.Search
             if (plyFromRoot == 0 && bestMoveLastIteration != Move.NullMove)
                 firstMove = bestMoveLastIteration;
 
-            MoveOrderer.OrderMoves(moves[..moveCount], board, firstMove);
+            MoveOrderer.OrderMoves(moves[..moveCount], board, firstMove, plyFromRoot);
 
             int alphaOrig = alpha;
             int bestScore = NegativeInfinity;
@@ -229,7 +231,19 @@ namespace Blaze.Search
                 }
                 alpha = Math.Max(score, alpha);
                 if (alpha >= beta)
+                {
+                    if (board.Squares[move.TargetSquare] == Piece.None)
+                    {
+                        if (move != MoveOrderer.Killer1[plyFromRoot])
+                        {
+                            MoveOrderer.Killer2[plyFromRoot] = MoveOrderer.Killer1[plyFromRoot];
+                            MoveOrderer.Killer1[plyFromRoot] = move;
+                        }
+                        ref int h = ref MoveOrderer.History[board.ColorToMove, move.StartingSquare, move.TargetSquare];
+                        h = Math.Min(h + depth * depth, 700_000); // keep below killer scores
+                    }
                     break;
+                }
             }
 
             TTFlag flag;
@@ -237,12 +251,12 @@ namespace Blaze.Search
 
             if (bestScore <= alphaOrig)
             {
-                flag = TTFlag.UpperBound;     // failed low: no reliable best move
+                flag = TTFlag.UpperBound;
                 storeMove = Move.NullMove;
             }
             else if (bestScore >= beta)
             {
-                flag = TTFlag.LowerBound;     // failed high: bestMoveHere caused the cutoff
+                flag = TTFlag.LowerBound;
             }
             else
             {
@@ -290,7 +304,7 @@ namespace Blaze.Search
             Span<Move> moves = stackalloc Move[218];
             int moveCount = board.GetLegalMoves(moves, true);
 
-            MoveOrderer.OrderMoves(moves[..moveCount], board, Move.NullMove);
+            MoveOrderer.OrderMoves(moves[..moveCount], board, Move.NullMove, 255);
 
             for (int i = 0; i < moveCount; i++)
             {

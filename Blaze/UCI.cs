@@ -38,6 +38,7 @@ namespace Blaze
 
                 case "ucinewgame":
                     Searcher.ClearTT();
+                    MoveOrderer.ClearHistory();
                     break;
 
                 case "position":
