@@ -20,6 +20,7 @@ namespace Blaze.Search
         private const int MaxDepth = 255;
         private const int NegativeInfinity = -1000000;
         private const int PositiveInfinity = 1000000;
+        private const int MateThreshold = 900000;
 
         private static bool searchCancelled;
 
@@ -38,11 +39,24 @@ namespace Blaze.Search
 
         private static Stopwatch stopwatch;
 
+        private static readonly TranspositionTable tt = new TranspositionTable(64);
+
         public static event Action<Move> OnSearchComplete;
 
         public static void EndSearch()
         {
             searchCancelled = true;
+        }
+
+        public static void ClearTT()
+        {
+            tt.Clear();
+        }
+
+        // Call on "setoption name Hash value N"
+        public static void ResizeTT(int sizeMb)
+        {
+            tt.Resize(sizeMb);
         }
 
         public static void StartNewSearch()
@@ -51,6 +65,8 @@ namespace Blaze.Search
             board = MatchManager.board;
 
             searchCancelled = false;
+
+            tt.NewSearch();
 
             pvArray = new Move[MaxDepth][];
             pvLength = new int[MaxDepth];
@@ -124,6 +140,31 @@ namespace Blaze.Search
             if (board.IsDraw())
                 return 0;
 
+            ulong key = board.CurrentHash;
+            Move ttMove = Move.NullMove;
+
+            if (depth > 0 && tt.Probe(key, out TTEntry entry))
+            {
+                ttMove = entry.Move;
+
+                // No cutoffs at the root or on the previous PV line, so we always
+                // get a real best move and a full-length PV out of the search.
+                if (plyFromRoot > 0 && !onPv && entry.Depth >= depth)
+                {
+                    int ttScore = ScoreFromTT(entry.Score, plyFromRoot);
+
+                    switch (entry.Flag)
+                    {
+                        case TTFlag.Exact:
+                            return ttScore;
+                        case TTFlag.LowerBound when ttScore >= beta:
+                            return ttScore;
+                        case TTFlag.UpperBound when ttScore <= alpha:
+                            return ttScore;
+                    }
+                }
+            }
+
             Span<Move> moves = stackalloc Move[218];
             int moveCount = board.GetLegalMoves(moves);
 
@@ -140,9 +181,17 @@ namespace Blaze.Search
 
             Move pvMove = onPv && plyFromRoot < prevPvLength ? prevPv[plyFromRoot] : Move.NullMove;
 
-            MoveOrderer.OrderMoves(moves[..moveCount], board, plyFromRoot == 0 ? bestMoveLastIteration : Move.NullMove);
+            Move firstMove = ttMove;
+            if (pvMove != Move.NullMove)
+                firstMove = pvMove;
+            if (plyFromRoot == 0 && bestMoveLastIteration != Move.NullMove)
+                firstMove = bestMoveLastIteration;
 
+            MoveOrderer.OrderMoves(moves[..moveCount], board, firstMove);
+
+            int alphaOrig = alpha;
             int bestScore = NegativeInfinity;
+            Move bestMoveHere = Move.NullMove;
 
             for (int i = 0; i < moveCount; i++)
             {
@@ -160,6 +209,7 @@ namespace Blaze.Search
                 if (score > bestScore)
                 {
                     bestScore = score;
+                    bestMoveHere = move;
 
                     pvArray[plyFromRoot][0] = move;
 
@@ -181,7 +231,47 @@ namespace Blaze.Search
                 if (alpha >= beta)
                     break;
             }
+
+            TTFlag flag;
+            Move storeMove = bestMoveHere;
+
+            if (bestScore <= alphaOrig)
+            {
+                flag = TTFlag.UpperBound;     // failed low: no reliable best move
+                storeMove = Move.NullMove;
+            }
+            else if (bestScore >= beta)
+            {
+                flag = TTFlag.LowerBound;     // failed high: bestMoveHere caused the cutoff
+            }
+            else
+            {
+                flag = TTFlag.Exact;
+            }
+
+            tt.Store(key, depth, ScoreToTT(bestScore, plyFromRoot), flag, storeMove);
+
             return bestScore;
+        }
+
+        private static int ScoreToTT(int score, int plyFromRoot)
+        {
+            if (score > MateThreshold)
+                return score + plyFromRoot;
+            if (score < -MateThreshold)
+                return score - plyFromRoot;
+
+            return score;
+        }
+
+        private static int ScoreFromTT(int score, int plyFromRoot)
+        {
+            if (score > MateThreshold)
+                return score - plyFromRoot;
+            if (score < -MateThreshold)
+                return score + plyFromRoot;
+
+            return score;
         }
 
         private static int Quiesce(int alpha, int beta)
@@ -249,6 +339,7 @@ namespace Blaze.Search
                 $"score {scoreStr} " +
                 $"nodes {nodes} " +
                 $"nps {nps} " +
+                $"hashfull {tt.HashFull()} " +
                 $"time {elapsedMs} " +
                 $"pv {pvLine.Trim()}"
             );

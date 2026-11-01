@@ -37,6 +37,7 @@ namespace Blaze
                     break;
 
                 case "ucinewgame":
+                    Searcher.ClearTT();
                     break;
 
                 case "position":
